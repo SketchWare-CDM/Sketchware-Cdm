@@ -27,26 +27,30 @@ public class MyProjectButton extends LinearLayout {
         initialize(context);
     }
 
-    private void initialize(Context context) {
-        setLayoutParams(new LinearLayout.LayoutParams(
+    private void setup(Context context) {
+        LayoutParams params = new LayoutParams(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                1.0f));
+                1.0f);
+        setLayoutParams(params);
 
         wB.a(context, this, R.layout.myproject_button);
-        icon = findViewById(R.id.icon);
-        name = findViewById(R.id.name);
+        icon = findViewById(R.id.icon_button);
+        name = findViewById(R.id.name_button);
     }
 
-    public int getButtonId() {
+    public int getId() {
         return id;
     }
 
-    public static MyProjectButton create(Context context, int id, @DrawableRes int resId, String label) {
+
+    public static MyProjectButton newInstance(Context context, int buttonId,
+                                              @DrawableRes int iconResId, String buttonLabel) {
         MyProjectButton button = new MyProjectButton(context);
-        button.id = id;
-        button.icon.setImageResource(resId);
-        button.name.setText(label);
+        button.id = buttonId;
+        button.icon.setImageResource(iconResId);
+        button.name.setText(buttonLabel);
         return button;
     }
+
 }

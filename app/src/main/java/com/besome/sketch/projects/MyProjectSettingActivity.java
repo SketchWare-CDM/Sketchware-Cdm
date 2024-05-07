@@ -86,67 +86,82 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (data == null) {
-            SketchwareUtil.toast("Received invalid data");
             finish();
             return;
         }
         Uri uri = data.getData();
-        if (requestCode == REQUEST_CODE_PICK_ICON) {
-            if (resultCode == RESULT_OK && uri != null) {
-                String filename = HB.a(getApplicationContext(), uri);
-                Bitmap bitmap = iB.a(filename, 96, 96);
-                try {
-                    int attributeInt = new ExifInterface(filename).getAttributeInt("Orientation", -1);
-                    Bitmap newBitmap = iB.a(bitmap, attributeInt != 3 ? attributeInt != 6 ? attributeInt != 8 ? 0 : 270 : 90 : 180);
-                    appIcon.setImageBitmap(newBitmap);
-                    saveBitmapTo(newBitmap, getCustomIconPath());
-                    projectHasCustomIcon = true;
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+        if (requestCode == REQUEST_CODE_PICK_ICON && resultCode == RESULT_OK) {
+            String filename = HB.a(this, uri);
+            Bitmap bitmap = iB.a(filename, 96, 96);
+            try {
+                int orientation = new ExifInterface(filename).getAttributeInt("Orientation", -1);
+                Bitmap oriented = iB.a(bitmap, orientation == 3 ? 180 : orientation == 6 ? 90 : orientation == 8 ? 270 : 0);
+                appIcon.setImageBitmap(oriented);
+                saveBitmapTo(oriented, getCustomIconPath());
+                projectHasCustomIcon = true;
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         } else {
             Bundle extras = data.getExtras();
             if (requestCode == REQUEST_CODE_PICK_CROPPED_ICON && resultCode == RESULT_OK && extras != null) {
-                try {
-                    Bitmap bitmap = extras.getParcelable("data");
-                    appIcon.setImageBitmap(bitmap);
-                    projectHasCustomIcon = true;
-                    saveBitmapTo(bitmap, getCustomIconPath());
-                } catch (Exception ignored) {
-                }
+                Bitmap bitmap = extras.getParcelable("data");
+                appIcon.setImageBitmap(bitmap);
+                saveBitmapTo(bitmap, getCustomIconPath());
+                projectHasCustomIcon = true;
             }
         }
     }
 
+
     @Override
-    public void onClick(View v) {
-        int id = v.getId();
+    public void onClick(View view) {
+        int id = view.getId();
         if (id == R.id.advanced_setting) {
-            showHideAdvancedSettings();
+            toggleAdvancedSettings();
         } else if (id == R.id.app_icon_layout) {
             showCustomIconOptions();
         } else if (id == R.id.common_dialog_cancel_button) {
             finish();
         } else if (id == R.id.common_dialog_ok_button) {
-            mB.a(v);
             if (isInputValid()) {
                 new SaveProjectAsyncTask(getApplicationContext()).execute();
             }
         } else if (id == R.id.img_theme_color_help) {
-            if (colorGuide.getVisibility() == View.VISIBLE) {
-                colorGuide.setVisibility(View.GONE);
-            } else {
-                colorGuide.setVisibility(View.VISIBLE);
-            }
+            toggleColorGuide();
         } else if (id == R.id.ver_code || id == R.id.ver_name) {
-            if (ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_USE_NEW_VERSION_CONTROL)) {
-                new VersionDialog(this).show();
-            } else {
-                showOldVersionControlDialog();
-            }
+            showVersionDialog();
         }
     }
+
+    private void toggleAdvancedSettings() {
+        if (advancedSettingsLayout.getVisibility() == View.GONE) {
+            advancedSettingsLayout.setVisibility(View.VISIBLE);
+        } else {
+            advancedSettingsLayout.setVisibility(View.GONE);
+        }
+    }
+
+    private void showCustomIconOptions() {
+        startActivityForResult(new Intent(this, PickIconActivity.class), REQUEST_CODE_PICK_ICON);
+    }
+
+    private void toggleColorGuide() {
+        if (colorGuide.getVisibility() == View.VISIBLE) {
+            colorGuide.setVisibility(View.GONE);
+        } else {
+            colorGuide.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void showVersionDialog() {
+        if (ConfigActivity.isSettingEnabled(ConfigActivity.SETTING_USE_NEW_VERSION_CONTROL)) {
+            new VersionDialog(this).show();
+        } else {
+            showOldVersionControlDialog();
+        }
+    }
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -155,40 +170,36 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
         if (!j()) {
             finish();
         }
-        sc_id = getIntent().getStringExtra("sc_id");
-        updatingExistingProject = getIntent().getBooleanExtra("is_update", false);
+        String projectId = getIntent().getStringExtra("sc_id");
+        boolean isExistingProject = getIntent().getBooleanExtra("is_update", false);
         boolean expandAdvancedOptions = getIntent().getBooleanExtra("advanced_open", false);
 
         ((TextView) findViewById(R.id.tv_change_icon)).setText(Helper.getResString(R.string.myprojects_settings_description_change_icon));
         findViewById(R.id.contents).setOnClickListener(this);
         findViewById(R.id.app_icon_layout).setOnClickListener(this);
         findViewById(R.id.advanced_setting).setOnClickListener(this);
-        projectVersionCodeView = findViewById(R.id.ver_code);
-        projectVersionCodeView.setOnClickListener(this);
-        projectVersionNameView = findViewById(R.id.ver_name);
-        projectVersionNameView.setOnClickListener(this);
+        versionCodeView = findViewById(R.id.ver_code);
+        versionNameView = findViewById(R.id.ver_name);
         TextInputLayout appName = findViewById(R.id.ti_app_name);
         TextInputLayout packageName = findViewById(R.id.ti_package_name);
         TextInputLayout projectName = findViewById(R.id.ti_project_name);
         appName.setHint(Helper.getResString(R.string.myprojects_settings_hint_enter_application_name));
         packageName.setHint(Helper.getResString(R.string.myprojects_settings_hint_enter_package_name));
         projectName.setHint(Helper.getResString(R.string.myprojects_settings_hint_enter_project_name));
-        projectAppName = findViewById(R.id.et_app_name);
-        projectPackageName = findViewById(R.id.et_package_name);
-        this.projectName = findViewById(R.id.et_project_name);
+        appNameEditText = findViewById(R.id.et_app_name);
+        packageNameEditText = findViewById(R.id.et_package_name);
+        projectNameEditText = findViewById(R.id.et_project_name);
         ((TextView) findViewById(R.id.tv_advanced_settings)).setText(Helper.getResString(R.string.myprojects_settings_title_advanced_settings));
         appIcon = findViewById(R.id.app_icon);
 
-        projectAppNameValidator = new LB(getApplicationContext(), appName);
-        projectPackageNameValidator = new UB(getApplicationContext(), packageName);
+        appNameValidator = new LB(getApplicationContext(), appName);
+        packageNameValidator = new UB(getApplicationContext(), packageName);
         projectNameValidator = new VB(getApplicationContext(), projectName);
-        projectPackageName.setPrivateImeOptions("defaultInputmode=english;");
-        this.projectName.setPrivateImeOptions("defaultInputmode=english;");
-        projectPackageName.setOnFocusChangeListener((v, hasFocus) -> {
-            if (hasFocus) {
-                if (!shownPackageNameChangeWarning && !((EditText) v).getText().toString().trim().contains("com.my.newproject")) {
-                    showPackageNameChangeWarning();
-                }
+        packageNameEditText.setPrivateImeOptions("defaultInputmode=english;");
+        projectNameEditText.setPrivateImeOptions("defaultInputmode=english;");
+        packageNameEditText.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus && !shownPackageNameChangeWarning) {
+                showPackageNameChangeWarning();
             }
         });
         themeColorsContainer = findViewById(R.id.layout_theme_colors);
@@ -196,14 +207,9 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
         colorGuide = findViewById(R.id.img_color_guide);
         advancedSettingsContainer = findViewById(R.id.advanced_setting_layout);
         /* Save & Cancel buttons */
-        r.setOnClickListener(this);
-        s.setOnClickListener(this);
+        findViewById(R.id.common_dialog_save_button).setOnClickListener(this);
+        findViewById(R.id.common_dialog_cancel_button).setOnClickListener(this);
 
-        projectThemeColors[0] = getResources().getColor(R.color.color_accent);
-        projectThemeColors[1] = getResources().getColor(R.color.color_primary);
-        projectThemeColors[2] = getResources().getColor(R.color.color_primary_dark);
-        projectThemeColors[3] = getResources().getColor(R.color.color_control_highlight);
-        projectThemeColors[4] = getResources().getColor(R.color.color_control_normal);
         for (int i = 0; i < themeColorKeys.length; i++) {
             ThemeColorView colorView = new ThemeColorView(getApplicationContext(), i);
             colorView.name.setText(themeColorLabels[i]);
@@ -216,23 +222,23 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
             });
         }
         /* Set the cancel button's label */
-        b(Helper.getResString(R.string.common_word_cancel));
+        findViewById(R.id.common_dialog_cancel_button).setTag(Helper.getResString(R.string.common_word_cancel));
 
-        if (updatingExistingProject) {
+        if (isExistingProject) {
             /* Set the dialog's title & save button label */
-            e(Helper.getResString(R.string.myprojects_settings_actionbar_title_project_settings));
-            d(Helper.getResString(R.string.myprojects_settings_button_save));
+            setTitle(Helper.getResString(R.string.myprojects_settings_actionbar_title_project_settings));
+            findViewById(R.id.common_dialog_save_button).setTag(Helper.getResString(R.string.myprojects_settings_button_save));
 
-            HashMap<String, Object> metadata = lC.b(sc_id);
-            projectPackageName.setText(yB.c(metadata, "my_sc_pkg_name"));
-            this.projectName.setText(yB.c(metadata, "my_ws_name"));
-            projectAppName.setText(yB.c(metadata, "my_app_name"));
-            projectVersionCode = parseInt(yB.c(metadata, "sc_ver_code"), 1);
+            HashMap<String, Object> metadata = lC.b(projectId);
+            packageNameEditText.setText(yB.c(metadata, "my_sc_pkg_name"));
+            projectNameEditText.setText(yB.c(metadata, "my_ws_name"));
+            appNameEditText.setText(yB.c(metadata, "my_app_name"));
+            versionCode = parseInt(yB.c(metadata, "sc_ver_code"), 1);
             parseVersion(yB.c(metadata, "sc_ver_name"));
-            projectVersionCodeView.setText(yB.c(metadata, "sc_ver_code"));
-            projectVersionNameView.setText(yB.c(metadata, "sc_ver_name"));
-            projectHasCustomIcon = yB.a(metadata, "custom_icon");
-            if (projectHasCustomIcon) {
+            versionCodeView.setText(yB.c(metadata, "sc_ver_code"));
+            versionNameView.setText(yB.c(metadata, "sc_ver_name"));
+            hasCustomIcon = yB.a(metadata, "custom_icon");
+            if (hasCustomIcon) {
                 if (Build.VERSION.SDK_INT >= 24) {
                     appIcon.setImageURI(FileProvider.getUriForFile(getApplicationContext(), getApplicationContext().getPackageName() + ".provider", getCustomIcon()));
                 } else {
@@ -241,23 +247,23 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
             }
 
             for (int i = 0; i < themeColorKeys.length; i++) {
-                projectThemeColors[i] = yB.a(metadata, themeColorKeys[i], projectThemeColors[i]);
+                themeColors[i] = yB.a(metadata, themeColorKeys[i], themeColors[i]);
             }
         } else {
             /* Set the dialog's title & create button label */
-            e(Helper.getResString(R.string.myprojects_settings_actionbar_title_new_projet));
-            d(Helper.getResString(R.string.myprojects_settings_button_create_app));
+            setTitle(Helper.getResString(R.string.myprojects_settings_actionbar_title_new_projet));
+            findViewById(R.id.common_dialog_save_button).setTag(Helper.getResString(R.string.myprojects_settings_button_create_app));
 
             String newProjectName = getIntent().getStringExtra("my_ws_name");
             String newProjectPackageName = getIntent().getStringExtra("my_sc_pkg_name");
-            if (sc_id == null || sc_id.equals("")) {
-                sc_id = lC.b();
+            if (projectId == null || projectId.equals("")) {
+                projectId = lC.b();
                 newProjectName = lC.c();
                 newProjectPackageName = "com.my." + newProjectName.toLowerCase();
             }
-            projectPackageName.setText(newProjectPackageName);
-            this.projectName.setText(newProjectName);
-            projectAppName.setText(getIntent().getStringExtra("my_app_name"));
+            packageNameEditText.setText(newProjectPackageName);
+            projectNameEditText.setText(newProjectName);
+            appNameEditText.setText(getIntent().getStringExtra("my_app_name"));
 
             String newProjectVersionCode = getIntent().getStringExtra("sc_ver_code");
             String newProjectVersionName = getIntent().getStringExtra("sc_ver_name");
@@ -267,12 +273,12 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
             if (newProjectVersionName == null || newProjectVersionName.isEmpty()) {
                 newProjectVersionName = "1.0";
             }
-            projectVersionCode = parseInt(newProjectVersionCode, 1);
+            versionCode = parseInt(newProjectVersionCode, 1);
             parseVersion(newProjectVersionName);
-            projectVersionCodeView.setText(newProjectVersionCode);
-            projectVersionNameView.setText(newProjectVersionName);
-            projectHasCustomIcon = getIntent().getBooleanExtra("custom_icon", false);
-            if (projectHasCustomIcon) {
+            versionCodeView.setText(newProjectVersionCode);
+            versionNameView.setText(newProjectVersionName);
+            hasCustomIcon = getIntent().getBooleanExtra("custom_icon", false);
+            if (hasCustomIcon) {
                 if (Build.VERSION.SDK_INT >= 24) {
                     appIcon.setImageURI(FileProvider.getUriForFile(getApplicationContext(), getApplicationContext().getPackageName() + ".provider", getCustomIcon()));
                 } else {
@@ -284,15 +290,15 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
 
         if (expandAdvancedOptions) {
             advancedSettingsContainer.setVisibility(View.VISIBLE);
-            projectPackageName.requestFocus();
+            packageNameEditText.requestFocus();
         }
     }
+
 
     @Override
     public void onResume() {
         super.onResume();
-
-        if (!j()) {
+        if (!canGoBack()) {
             finish();
         }
     }
@@ -301,162 +307,157 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
     public void onStart() {
         super.onStart();
 
-        oB oBVar = new oB();
-        oBVar.f(wq.e() + File.separator + sc_id);
-        oBVar.f(wq.g() + File.separator + sc_id);
-        oBVar.f(wq.t() + File.separator + sc_id);
-        oBVar.f(wq.d() + File.separator + sc_id);
-        File o = getCustomIcon();
-        if (!o.exists()) {
+        File projectDir = new File(wq.e(), sc_id);
+        File imagesDir = new File(wq.g(), sc_id);
+        File dataDir = new File(wq.t(), sc_id);
+        File backupDir = new File(wq.d(), sc_id);
+        File iconFile = getCustomIcon();
+        if (!iconFile.exists()) {
             try {
-                o.createNewFile();
-            } catch (Exception e) {
+                iconFile.createNewFile();
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+        oB projectDirs = new oB();
+        projectDirs.add(projectDir);
+        projectDirs.add(imagesDir);
+        projectDirs.add(dataDir);
+        projectDirs.add(backupDir);
     }
 
-    private void showOldVersionControlDialog() {
+    private void showVersionControlDialog() {
         aB dialog = new aB(this);
         dialog.a(R.drawable.numbers_48);
-        dialog.b(Helper.getResString(R.string.myprojects_settings_version_control_title));
+        dialog.b(getString(R.string.myprojects_settings_version_control_title));
         View view = wB.a(getApplicationContext(), R.layout.property_popup_version_control);
-        ((TextView) view.findViewById(R.id.tv_code)).setText(Helper.getResString(R.string.myprojects_settings_version_control_title_code));
-        ((TextView) view.findViewById(R.id.tv_name)).setText(Helper.getResString(R.string.myprojects_settings_version_control_title_name));
+        ((TextView) view.findViewById(R.id.tv_code)).setText(getString(R.string.myprojects_settings_version_control_title_code));
+        ((TextView) view.findViewById(R.id.tv_name)).setText(getString(R.string.myprojects_settings_version_control_title_name));
 
-        NumberPicker versionCodePicker = view.findViewById(R.id.version_code);
-        NumberPicker versionNameFirstPartPicker = view.findViewById(R.id.version_name1);
-        NumberPicker versionNameSecondPartPicker = view.findViewById(R.id.version_name2);
+        NumberPicker codePicker = view.findViewById(R.id.version_code);
+        NumberPicker firstPartPicker = view.findViewById(R.id.version_name1);
+        NumberPicker secondPartPicker = view.findViewById(R.id.version_name2);
 
-        versionCodePicker.setWrapSelectorWheel(false);
-        versionNameFirstPartPicker.setWrapSelectorWheel(false);
-        versionNameSecondPartPicker.setWrapSelectorWheel(false);
+        codePicker.setWrapSelectorWheel(false);
+        firstPartPicker.setWrapSelectorWheel(false);
+        secondPartPicker.setWrapSelectorWheel(false);
 
-        int versionCode = Integer.parseInt(projectVersionCodeView.getText().toString());
-        int versionCodeMinimum = versionCode - 5;
-        int versionNameFirstPartMinimum = 1;
-        if (versionCodeMinimum <= 0) {
-            versionCodeMinimum = 1;
-        }
-        versionCodePicker.setMinValue(versionCodeMinimum);
-        versionCodePicker.setMaxValue(versionCode + 5);
-        versionCodePicker.setValue(versionCode);
+        int currentCode = Integer.parseInt(projectVersionCodeView.getText().toString());
+        int minCode = Math.max(currentCode - 5, 1);
+        int maxCode = currentCode + 5;
+        codePicker.setMinValue(minCode);
+        codePicker.setMaxValue(maxCode);
+        codePicker.setValue(currentCode);
 
         String[] split = projectVersionNameView.getText().toString().split("\\.");
-        AtomicInteger projectNewVersionNameFirstPart = new AtomicInteger(parseInt(split[0], 1));
-        AtomicInteger projectNewVersionNameSecondPart = new AtomicInteger(parseInt(split[1], 0));
-        if (projectNewVersionNameFirstPart.get() - 5 > 0) {
-            versionNameFirstPartMinimum = projectNewVersionNameFirstPart.get() - 5;
-        }
-        versionNameFirstPartPicker.setMinValue(versionNameFirstPartMinimum);
-        versionNameFirstPartPicker.setMaxValue(projectNewVersionNameFirstPart.get() + 5);
-        versionNameFirstPartPicker.setValue(projectNewVersionNameFirstPart.get());
+        int currentFirstPart = parseInt(split[0], 1);
+        int currentSecondPart = parseInt(split[1], 0);
+        int minFirstPart = Math.max(currentFirstPart - 5, 1);
+        int maxFirstPart = currentFirstPart + 5;
+        firstPartPicker.setMinValue(minFirstPart);
+        firstPartPicker.setMaxValue(maxFirstPart);
+        firstPartPicker.setValue(currentFirstPart);
 
-        versionNameSecondPartPicker.setMinValue(Math.max(projectNewVersionNameSecondPart.get() - 20, 0));
-        versionNameSecondPartPicker.setMaxValue(projectNewVersionNameSecondPart.get() + 20);
-        versionNameSecondPartPicker.setValue(projectNewVersionNameSecondPart.get());
+        secondPartPicker.setMinValue(Math.max(currentSecondPart - 20, 0));
+        secondPartPicker.setMaxValue(currentSecondPart + 20);
+        secondPartPicker.setValue(currentSecondPart);
         dialog.a(view);
 
-        versionCodePicker.setOnValueChangedListener((picker, oldVal, newVal) -> {
-            if (oldVal > newVal && newVal < projectVersionCode) {
-                picker.setValue(projectVersionCode);
+        codePicker.setOnValueChangedListener((picker, oldVal, newVal) -> {
+            if (newVal < currentCode) {
+                picker.setValue(currentCode);
             }
         });
-        versionNameFirstPartPicker.setOnValueChangedListener((picker, oldVal, newVal) -> {
-            projectNewVersionNameFirstPart.set(newVal);
-            if (oldVal > newVal) {
-                if (newVal < projectVersionNameFirstPart) {
-                    versionCodePicker.setValue(projectVersionNameFirstPart);
+        firstPartPicker.setOnValueChangedListener((picker, oldVal, newVal) -> {
+            if (newVal < currentFirstPart) {
+                if (newVal < minFirstPart) {
+                    picker.setValue(minFirstPart);
                 }
-                if (projectNewVersionNameFirstPart.get() == projectVersionNameFirstPart || projectNewVersionNameSecondPart.get() <= projectVersionNameSecondPart) {
-                    versionNameSecondPartPicker.setValue(projectVersionNameSecondPart);
-                    projectNewVersionNameSecondPart.set(projectVersionNameSecondPart);
+                if (newVal == minFirstPart || newVal > currentSecondPart) {
+                    secondPartPicker.setValue(currentSecondPart);
                 }
             }
         });
-        versionNameSecondPartPicker.setOnValueChangedListener((picker, oldVal, newVal) -> {
-            projectNewVersionNameSecondPart.set(newVal);
-            if (oldVal > newVal && newVal < projectVersionNameSecondPart && projectNewVersionNameFirstPart.get() < projectVersionNameFirstPart) {
-                picker.setValue(projectVersionNameSecondPart);
+        secondPartPicker.setOnValueChangedListener((picker, oldVal, newVal) -> {
+            if (newVal < currentSecondPart && newVal < minFirstPart) {
+                picker.setValue(currentSecondPart);
             }
         });
-        dialog.b(Helper.getResString(R.string.common_word_save), v -> {
+        dialog.b(getString(R.string.common_word_save), v -> {
             if (!mB.a()) {
-                projectVersionCodeView.setText(String.valueOf(versionCodePicker.getValue()));
-                projectVersionNameView.setText(projectNewVersionNameFirstPart + "." + projectNewVersionNameSecondPart);
+                projectVersionCodeView.setText(String.valueOf(codePicker.getValue()));
+                projectVersionNameView.setText(firstPartPicker.getValue() + "." + secondPartPicker.getValue());
                 dialog.dismiss();
             }
         });
-        dialog.a(Helper.getResString(R.string.common_word_cancel), Helper.getDialogDismissListener(dialog));
+        dialog.a(getString(R.string.common_word_cancel), Helper.getDialogDismissListener(dialog));
         dialog.show();
     }
 
-    private void showHideAdvancedSettings() {
-        if (!advancedSettingsContainer.isShown()) {
-            advancedSettingsContainer.setVisibility(View.VISIBLE);
-            gB.b(advancedSettingsContainer, 300, null);
+    private int parseInt(String value, int defaultValue) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+
+    private void toggleAdvancedSettings() {
+        final int duration = 300;
+        final View container = advancedSettingsContainer;
+        if (container.getVisibility() != View.VISIBLE) {
+            container.setVisibility(View.VISIBLE);
+            gB.b(container, duration, null);
             return;
         }
-        gB.a(advancedSettingsContainer, 300, new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationCancel(Animator animation) {
-            }
-
+        gB.a(container, duration, new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                advancedSettingsContainer.setVisibility(View.GONE);
-            }
-
-            @Override
-            public void onAnimationRepeat(Animator animation) {
-            }
-
-            @Override
-            public void onAnimationStart(Animator animation) {
+                container.setVisibility(View.GONE);
             }
         });
     }
+
 
     private void syncThemeColors() {
-        for (int i = 0; i < projectThemeColors.length; i++) {
-            ((ThemeColorView) themeColorsContainer.getChildAt(i)).color.setBackgroundColor(projectThemeColors[i]);
+        for (int i = 0; i < themeColorKeys.length; i++) {
+            ThemeColorView colorView = (ThemeColorView) themeColorsContainer.getChildAt(i);
+            colorView.setBackgroundColor(projectThemeColors[i]);
         }
     }
 
-    private void parseVersion(String toParse) {
-        try {
-            String[] split = toParse.split("\\.");
-            projectVersionNameFirstPart = parseInt(split[0], 1);
-            projectVersionNameSecondPart = parseInt(split[1], 0);
-        } catch (Exception ignored) {
-        }
+
+    private void parseVersion(String version) {
+        String[] versionParts = version.split("\\.");
+        projectVersionFirst = Integer.parseInt(versionParts[0]);
+        projectVersionSecond = Integer.parseInt(versionParts[1]);
     }
 
-    private void pickColor(int colorIndex) {
-        View view = wB.a(this, R.layout.color_picker);
-        view.setAnimation(AnimationUtils.loadAnimation(this, R.anim.abc_fade_in));
-        Zx zx = new Zx(view, this, projectThemeColors[colorIndex], false, false);
-        zx.a(pickedColor -> {
-            projectThemeColors[colorIndex] = pickedColor;
+    private void chooseColor(int index) {
+        View popup = wB.a(this, R.layout.color_picker);
+        Zx colorPicker = new Zx(popup, this, projectThemeColors[index], false, false);
+        colorPicker.a(chosenColor -> {
+            projectThemeColors[index] = chosenColor;
             syncThemeColors();
         });
-        zx.setAnimationStyle(R.anim.abc_fade_in);
-        zx.showAtLocation(view, Gravity.CENTER, 0, 0);
+        colorPicker.setAnimationStyle(R.anim.abc_fade_in);
+        colorPicker.showAtLocation(popup, Gravity.CENTER, 0, 0);
     }
 
-    private void showResetIconConfirmation() {
-        aB dialog = new aB(this);
-        dialog.b(Helper.getResString(R.string.common_word_settings));
-        dialog.a(R.drawable.default_icon);
-        dialog.a(Helper.getResString(R.string.myprojects_settings_confirm_reset_icon));
-        dialog.b(Helper.getResString(R.string.common_word_reset), v -> {
-            appIcon.setImageResource(R.drawable.default_icon);
-            projectHasCustomIcon = false;
-            dialog.dismiss();
-        });
-        dialog.a(Helper.getResString(R.string.common_word_cancel), Helper.getDialogDismissListener(dialog));
-        dialog.show();
+
+    private void showResetIconConfirmationDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.common_word_settings)
+                .setMessage(R.string.myprojects_settings_confirm_reset_icon)
+                .setPositiveButton(R.string.common_word_reset, (dialog, which) -> {
+                    appIcon.setImageResource(R.drawable.default_icon);
+                    projectHasCustomIcon = false;
+                })
+                .setNegativeButton(R.string.common_word_cancel, null)
+                .create().show();
     }
+
 
     private File getCustomIcon() {
         return new File(getCustomIconPath());
@@ -470,37 +471,28 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
         return projectPackageNameValidator.b() && projectNameValidator.b() && projectAppNameValidator.b();
     }
 
-    private void pickCustomIcon() {
-        Uri uri;
+    private void pickIcon() {
+        Uri iconUri;
         if (Build.VERSION.SDK_INT >= 24) {
-            uri = FileProvider.getUriForFile(getApplicationContext(), getApplicationContext().getPackageName() + ".provider", getCustomIcon());
+            iconUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", getCustomIcon());
         } else {
-            uri = Uri.fromFile(getCustomIcon());
+            iconUri = Uri.fromFile(getCustomIcon());
         }
 
         Intent intent = new Intent(Intent.ACTION_PICK);
         intent.setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*");
-        intent.putExtra("output", uri);
-        intent.putExtra("outputFormat", Bitmap.CompressFormat.PNG.toString());
-        intent.putExtra("return-data", true);
-        startActivityForResult(Intent.createChooser(intent, Helper.getResString(R.string.common_word_choose)),
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, iconUri);
+        intent.putExtra(MediaStore.EXTRA_SIZE_LIMIT, 921600); // 1024KB = 1024 x 1024 = 1048576
+        startActivityForResult(Intent.createChooser(intent, getString(R.string.common_word_choose)),
                 REQUEST_CODE_PICK_ICON);
     }
 
-    private void pickAndCropCustomIcon() {
-        Uri uri;
-        Intent intent = new Intent(Intent.ACTION_PICK);
-        if (Build.VERSION.SDK_INT >= 24) {
-            Context applicationContext = getApplicationContext();
-            uri = FileProvider.getUriForFile(applicationContext, getApplicationContext().getPackageName() + ".provider", getCustomIcon());
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-        } else {
-            uri = Uri.fromFile(getCustomIcon());
-        }
 
-        intent.setDataAndType(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, "image/*");
+    private void pickAndCropCustomIcon() {
+        Uri uri = getCustomIconUri();
+
+        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Audio.Media.EXTERNAL_CONTENT_URI);
+        intent.setType("image/*");
         intent.putExtra("crop", "true");
         intent.putExtra("aspectX", 1);
         intent.putExtra("aspectY", 1);
@@ -510,60 +502,66 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
         intent.putExtra("output", uri);
         intent.putExtra("outputFormat", Bitmap.CompressFormat.PNG.toString());
         intent.putExtra("return-data", true);
-        startActivityForResult(Intent.createChooser(intent, Helper.getResString(R.string.common_word_choose)),
-                REQUEST_CODE_PICK_CROPPED_ICON);
+
+        startActivityForResult(Intent.createChooser(intent, getString(R.string.common_word_choose)), REQUEST_CODE_PICK_CROPPED_ICON);
     }
 
-    private void showCustomIconOptions() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(Helper.getResString(R.string.myprojects_settings_context_menu_title_choose));
-        builder.setItems(new String[]{
-                Helper.getResString(R.string.myprojects_settings_context_menu_title_choose_gallery),
-                Helper.getResString(R.string.myprojects_settings_context_menu_title_choose_gallery_with_crop),
-                Helper.getResString(R.string.myprojects_settings_context_menu_title_choose_gallery_default)
-        }, (dialog, which) -> {
-            switch (which) {
-                case 0:
-                    pickCustomIcon();
-                    break;
-
-                case 1:
-                    pickAndCropCustomIcon();
-                    break;
-
-                case 2:
-                    if (projectHasCustomIcon) showResetIconConfirmation();
-                    break;
-            }
-        });
-        AlertDialog create = builder.create();
-        create.setCanceledOnTouchOutside(true);
-        create.show();
+    private Uri getCustomIconUri() {
+        File customIconFile = getCustomIcon();
+        return FileProvider.getUriForFile(this, getPackageName() + ".provider", customIconFile);
     }
 
-    private void showPackageNameChangeWarning() {
+    private void showCustomIconOptionsDialog() {
+        String[] options = {
+                getString(R.string.myprojects_settings_context_menu_title_choose_gallery),
+                getString(R.string.myprojects_settings_context_menu_title_choose_gallery_with_crop),
+                getString(R.string.myprojects_settings_context_menu_title_choose_gallery_default)
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.myprojects_settings_context_menu_title_choose)
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0:
+                            pickCustomIcon();
+                            break;
+                        case 1:
+                            pickAndCropCustomIcon();
+                            break;
+                        case 2:
+                            if (projectHasCustomIcon) showResetIconConfirmation();
+                            break;
+                    }
+                })
+                .create()
+                .show();
+    }
+
+
+    private void showPackageNameChangeWarningDialog() {
         shownPackageNameChangeWarning = true;
-        aB dialog = new aB(this);
-        dialog.b(Helper.getResString(R.string.common_word_warning));
-        dialog.a(R.drawable.break_warning_96_red);
-        dialog.a(Helper.getResString(R.string.myprojects_settings_message_package_rename));
-        dialog.b(Helper.getResString(R.string.common_word_ok), Helper.getDialogDismissListener(dialog));
-        dialog.show();
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.common_word_warning)
+                .setIcon(R.drawable.break_warning_96_red)
+                .setMessage(R.string.myprojects_settings_message_package_rename)
+                .setPositiveButton(R.string.common_word_ok, null)
+                .create().show();
     }
 
-    private int parseInt(String input, int fallback) {
+
+    private int parseIntOrDefault(String input, int defaultValue) {
         try {
             return Integer.parseInt(input);
-        } catch (Exception unused) {
-            return fallback;
+        } catch (NumberFormatException ignored) {
+            return defaultValue;
         }
     }
 
-    private void saveBitmapTo(Bitmap bitmap, String path) {
-        try (FileOutputStream fileOutputStream = new FileOutputStream(path)) {
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fileOutputStream);
-            fileOutputStream.flush();
-        } catch (IOException ignored) {
+    private void saveBitmapTo(Bitmap bitmap, String filePath) {
+        try (FileOutputStream outputStream = new FileOutputStream(filePath)) {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+        } catch (IOException e) {
+            // Ignore
         }
     }
 
@@ -594,50 +592,41 @@ public class MyProjectSettingActivity extends BaseDialogActivity implements View
         }
 
         @Override
-        public void a() {
-            h();
-            Intent intent = getIntent();
-            intent.putExtra("sc_id", sc_id);
-            intent.putExtra("is_new", !updatingExistingProject);
-            intent.putExtra("index", intent.getIntExtra("index", -1));
-            setResult(RESULT_OK, intent);
+        public void onPostExecute(Void result) {
+            Intent data = new Intent();
+            data.putExtra("sc_id", scId);
+            data.putExtra("isNew", !updatingExistingProject);
+            data.putExtra("index", getIntent().getIntExtra("index", -1));
+            setResult(RESULT_OK, data);
             finish();
         }
 
         @Override
-        public void b() {
-            HashMap<String, Object> data = new HashMap<>();
-            data.put("sc_id", sc_id);
-            data.put("my_sc_pkg_name", projectPackageName.getText().toString());
-            data.put("my_ws_name", projectName.getText().toString());
-            data.put("my_app_name", projectAppName.getText().toString());
+        public void c() {
+            HashMap<String, Object> values = new HashMap<>();
+            values.put("package_name", projectPackageName.getText().toString());
+            values.put("workspace_name", projectName.getText().toString());
+            values.put("app_name", projectAppName.getText().toString());
+            values.put("custom_icon", projectHasCustomIcon);
+            values.put("version_code", projectVersionCodeView.getText().toString());
+            values.put("version_name", projectVersionNameView.getText().toString());
+            values.put("sketchware_ver", GB.d(getApplicationContext()));
+            for (int i = 0; i < themeColorKeys.length; i++) {
+                values.put(themeColorKeys[i], projectThemeColors[i]);
+            }
             if (updatingExistingProject) {
-                data.put("custom_icon", projectHasCustomIcon);
-                data.put("sc_ver_code", projectVersionCodeView.getText().toString());
-                data.put("sc_ver_name", projectVersionNameView.getText().toString());
-                data.put("sketchware_ver", GB.d(getApplicationContext()));
-                for (int i = 0; i < themeColorKeys.length; i++) {
-                    data.put(themeColorKeys[i], projectThemeColors[i]);
-                }
-                lC.b(sc_id, data);
+                lC.b(sc_id, values);
             } else {
-                data.put("my_sc_reg_dt", new nB().a("yyyyMMddHHmmss"));
-                data.put("custom_icon", projectHasCustomIcon);
-                data.put("sc_ver_code", projectVersionCodeView.getText().toString());
-                data.put("sc_ver_name", projectVersionNameView.getText().toString());
-                data.put("sketchware_ver", GB.d(getApplicationContext()));
-                for (int i = 0; i < themeColorKeys.length; i++) {
-                    data.put(themeColorKeys[i], projectThemeColors[i]);
-                }
-                lC.a(sc_id, data);
+                values.put("reg_date", new nB().a("yyyyMMddHHmmss"));
+                lC.a(sc_id, values);
                 wq.a(getApplicationContext(), sc_id);
                 new oB().b(wq.b(sc_id));
             }
         }
 
         @Override
-        public void a(String str) {
-            h();
+        public void onCancelled(String error) {
+            finishTask();
         }
 
     }

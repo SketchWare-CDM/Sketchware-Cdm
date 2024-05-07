@@ -254,82 +254,71 @@ public class LogicEditorActivity extends BaseAppCompatActivity implements View.O
         invalidateOptionsMenu();
     }
 
-    public final void E() {
-        eC a2 = jC.a(B);
-        String javaName = M.getJavaName();
-        a2.a(javaName, C + "_" + D, o.getBlocks());
+    public final void saveProject() {
+        jC.a(projectId, javaName, blocks);
     }
 
-    public final void G() {
-        aB aBVar = new aB(this);
-        aBVar.b(getTranslatedString(R.string.logic_editor_title_add_new_list));
-        aBVar.a(R.drawable.add_96_blue);
-        View a2 = wB.a(this, R.layout.logic_popup_add_list);
-        RadioGroup radioGroup = a2.findViewById(R.id.rg_type);
-        EditText editText = a2.findViewById(R.id.ed_input);
-        ((TextInputLayout) a2.findViewById(R.id.ti_input)).setHint(getTranslatedString(R.string.logic_editor_hint_enter_variable_name));
-        ((TextView) a2.findViewById(R.id.rb_int)).setText(getTranslatedString(R.string.logic_variable_type_number));
-        ((TextView) a2.findViewById(R.id.rb_string)).setText(getTranslatedString(R.string.logic_variable_type_string));
-        ((TextView) a2.findViewById(R.id.rb_map)).setText(getTranslatedString(R.string.logic_variable_type_map));
-        ZB zb = new ZB(getContext(), a2.findViewById(R.id.ti_input), uq.b, uq.a(), jC.a(B).a(M));
-        editText.setPrivateImeOptions("defaultInputmode=english;");
-        aBVar.a(a2);
-        aBVar.b(getTranslatedString(R.string.common_word_add), v -> {
-            if (zb.b()) {
-                int i = 1;
-                int checkedRadioButtonId = radioGroup.getCheckedRadioButtonId();
-                if (checkedRadioButtonId != R.id.rb_int) {
-                    if (checkedRadioButtonId == R.id.rb_string) {
-                        i = 2;
-                    } else if (checkedRadioButtonId == R.id.rb_map) {
-                        i = 3;
-                    }
-                }
-
-                a(i, editText.getText().toString());
-                aBVar.dismiss();
-            }
-        });
-        aBVar.a(getTranslatedString(R.string.common_word_cancel), Helper.getDialogDismissListener(aBVar));
-        aBVar.show();
-    }
-
-    private void showAddNewVariableDialog() {
+    public final void showAddNewListDialog() {
         aB dialog = new aB(this);
-        dialog.b(getTranslatedString(R.string.logic_editor_title_add_new_variable));
-        dialog.a(R.drawable.add_96_blue);
-
-        View customView = wB.a(this, R.layout.logic_popup_add_variable);
-        RadioGroup radioGroup = customView.findViewById(R.id.rg_type);
-        EditText editText = customView.findViewById(R.id.ed_input);
+        dialog.setTitle(getTranslatedString(R.string.logic_editor_title_add_new_list));
+        dialog.setIcon(R.drawable.add_96_blue);
+        View customView = wB.a(this, R.layout.logic_popup_add_list);
+        RadioGroup typeRadioGroup = customView.findViewById(R.id.rg_type);
+        EditText nameEditText = customView.findViewById(R.id.ed_input);
         ((TextInputLayout) customView.findViewById(R.id.ti_input)).setHint(getTranslatedString(R.string.logic_editor_hint_enter_variable_name));
-        editText.setPrivateImeOptions("defaultInputmode=english;");
-        ((TextView) customView.findViewById(R.id.rb_boolean)).setText(getTranslatedString(R.string.logic_variable_type_boolean));
-        ((TextView) customView.findViewById(R.id.rb_int)).setText(getTranslatedString(R.string.logic_variable_type_number));
-        ((TextView) customView.findViewById(R.id.rb_string)).setText(getTranslatedString(R.string.logic_variable_type_string));
-        ((TextView) customView.findViewById(R.id.rb_map)).setText(getTranslatedString(R.string.logic_variable_type_map));
         ZB nameValidator = new ZB(getContext(), customView.findViewById(R.id.ti_input), uq.b, uq.a(), jC.a(B).a(M));
-        dialog.a(customView);
-        dialog.b(getTranslatedString(R.string.common_word_add), v -> {
+        dialog.setView(customView);
+        dialog.setPositiveButton(getTranslatedString(R.string.common_word_add), (dialogInterface, i) -> {
             int variableType = 1;
-            if (radioGroup.getCheckedRadioButtonId() == R.id.rb_boolean) {
-                variableType = 0;
-            } else if (radioGroup.getCheckedRadioButtonId() != R.id.rb_int) {
-                if (radioGroup.getCheckedRadioButtonId() == R.id.rb_string) {
+            if (typeRadioGroup.getCheckedRadioButtonId() != R.id.rb_int) {
+                if (typeRadioGroup.getCheckedRadioButtonId() == R.id.rb_string) {
                     variableType = 2;
-                } else if (radioGroup.getCheckedRadioButtonId() == R.id.rb_map) {
+                } else if (typeRadioGroup.getCheckedRadioButtonId() == R.id.rb_map) {
                     variableType = 3;
                 }
             }
 
             if (nameValidator.b()) {
-                b(variableType, editText.getText().toString());
+                a(variableType, nameEditText.getText().toString());
                 dialog.dismiss();
             }
         });
-        dialog.a(getTranslatedString(R.string.common_word_cancel), Helper.getDialogDismissListener(dialog));
+        dialog.setNegativeButton(getTranslatedString(R.string.common_word_cancel), Helper.getDialogDismissListener(dialog));
         dialog.show();
     }
+
+    private void showAddNewVariableDialog() {
+        AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(this);
+        dialogBuilder.setTitle(getTranslatedString(R.string.logic_editor_title_add_new_variable));
+        dialogBuilder.setIcon(R.drawable.add_96_blue);
+
+        View customView = LayoutInflater.from(this).inflate(R.layout.logic_popup_add_variable, null);
+        RadioGroup variableTypeRadioGroup = customView.findViewById(R.id.rg_type);
+        EditText variableNameEditText = customView.findViewById(R.id.ed_input);
+        TextInputLayout variableNameTextInputLayout = customView.findViewById(R.id.ti_input);
+        variableNameTextInputLayout.setHint(getTranslatedString(R.string.logic_editor_hint_enter_variable_name));
+        variableNameEditText.setPrivateImeOptions("defaultInputmode=english;");
+
+        ZB variableNameValidator = new ZB(this, variableNameTextInputLayout, uq.b, uq.a(), jC.a(B).a(M));
+        dialogBuilder.setView(customView);
+        dialogBuilder.setPositiveButton(getTranslatedString(R.string.common_word_add), (dialog, which) -> {
+            int variableTypeId = variableTypeRadioGroup.getCheckedRadioButtonId();
+            int variableType;
+            if (variableTypeId == R.id.rb_boolean) {
+                variableType = 0;
+            } else {
+                variableType = variableTypeId == R.id.rb_string ? 2 : 3;
+            }
+
+            if (variableNameValidator.b()) {
+                b(variableType, variableNameEditText.getText().toString());
+                dialog.dismiss();
+            }
+        });
+        dialogBuilder.setNegativeButton(getTranslatedString(R.string.common_word_cancel), Helper.getDialogDismissListener());
+        dialogBuilder.show();
+    }
+
 
     public final void I() {
         ArrayList<MoreBlockCollectionBean> pa = Pp.h().f();
